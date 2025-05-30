@@ -5,7 +5,7 @@ import { useLocalStorage } from "@vueuse/core";
 const ROOT_URL = `${import.meta.env.VITE_API_URL}`;
 
 /**Capture the access token from local storage */
-const access_token = useLocalStorage("x-token", null);
+const access_token = useLocalStorage("access_token", null);
 
 /**Create an axios instance */
 const axiosInstance = axios.create({
@@ -13,20 +13,14 @@ const axiosInstance = axios.create({
 });
 
 /**Create a request interceptor */
-axiosInstance.interceptors.request.use(
-  (config) => {
-    /** Add token to header if exists */
-    if (access_token) {
-      config.headers["Authorization"] = `Bearer ${access_token.value}`;
-    }
 
-    return config;
-  },
-  (error) => {
-    /**Do something with request error */
-    return Promise.reject(error);
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("access_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-);
+  return config;
+});
 
 /** Handle Forbidden and Unauthorized errors */
 axiosInstance.interceptors.response.use(
@@ -37,7 +31,7 @@ axiosInstance.interceptors.response.use(
     console.log(error);
 
     /** Handle 401 Unauthorized error */
-    if (error.response.status === 401) {
+    if (error.response?.status === 401) {
       console.log("Unauthorized access. Logging out...");
       /** Perform a dynamic import of store to avoid circular dependency */
       const { useAuthStore } = await import("../../store/auth.store");
