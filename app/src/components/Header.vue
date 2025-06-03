@@ -22,35 +22,50 @@
 
       <!-- Auth & Hamburger -->
       <div class="flex items-center gap-4">
-        <template v-if="isAuthenticated">
-          <!-- Avatar -->
-          <div class="relative">
+        <!-- Show loading indicator while fetching user on app load -->
+        <template v-if="authStore.isLoadingUser">
+          <span class="text-gray-500">Loading...</span>
+        </template>
+        <template v-else-if="authStore.isAuthenticated">
+          <!-- User avatar and name with dropdown toggle -->
+          <div
+            class="relative flex items-center space-x-3 cursor-pointer"
+            @click="toggleDropdown"
+            ref="dropdownAvatarRef"
+          >
             <img
-              src="https://i.pravatar.cc/40"
-              class="rounded-full h-9 w-9 cursor-pointer border"
-              @click="toggleDropdown"
+              :src="authStore.user?.avatarUrl || 'https://i.pravatar.cc/40'"
+              class="rounded-full h-9 w-9 border object-cover"
               alt="avatar"
             />
-            <div
-              v-if="showDropdown"
-              class="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-50"
+            <span class="hidden md:inline font-semibold text-gray-800">
+              {{ authStore.user?.name || "User" }}
+            </span>
+          </div>
+
+          <!-- Dropdown menu -->
+          <div
+            v-if="showDropdown"
+            class="absolute top-full mt-2 w-40 bg-white border rounded-md shadow-lg z-50"
+            ref="dropdownMenuRef"
+          >
+            <RouterLink
+              to="/profile"
+              class="block px-4 py-2 hover:bg-gray-100"
+              @click="closeDropdown"
             >
-              <RouterLink
-                to="/profile"
-                class="block px-4 py-2 hover:bg-gray-100"
-              >
-                Profile
-              </RouterLink>
-              <button
-                @click="logout"
-                class="w-full text-left px-4 py-2 text-red-500 hover:bg-red-50"
-              >
-                Log out
-              </button>
-            </div>
+              Profile
+            </RouterLink>
+            <button
+              @click="handleLogout"
+              class="w-full text-left px-4 py-2 text-red-500 hover:bg-red-50"
+            >
+              Log out
+            </button>
           </div>
         </template>
         <template v-else>
+          <!-- Login button when not authenticated -->
           <button
             @click="openLoginModal"
             class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
@@ -59,7 +74,7 @@
           </button>
         </template>
 
-        <!-- Mobile toggle -->
+        <!-- Mobile menu toggle -->
         <button class="md:hidden" @click="mobileMenuOpen = !mobileMenuOpen">
           <span class="text-gray-800 font-bold text-lg">
             {{ mobileMenuOpen ? "✕" : "☰" }}
@@ -68,7 +83,7 @@
       </div>
     </nav>
 
-    <!-- Mobile Nav -->
+    <!-- Mobile Nav menu -->
     <div
       v-if="mobileMenuOpen"
       class="md:hidden px-4 pt-4 pb-6 space-y-3 bg-white border-t"
@@ -78,64 +93,148 @@
         :key="item.path"
         :to="item.path"
         @click="mobileMenuOpen = false"
-        class="block"
+        class="block py-2 px-3 rounded hover:bg-gray-100"
       >
         {{ item.label }}
       </RouterLink>
-      <div v-if="isAuthenticated">
-        <RouterLink to="/profile" class="block" @click="mobileMenuOpen = false"
-          >Profile</RouterLink
+
+      <template v-if="authStore.isLoadingUser">
+        <span class="block py-2 px-3 text-gray-500">Loading...</span>
+      </template>
+      <template v-else-if="authStore.isAuthenticated">
+        <RouterLink
+          to="/profile"
+          class="block py-2 px-3 rounded hover:bg-gray-100"
+          @click="mobileMenuOpen = false"
         >
-        <button @click="logout" class="text-red-500">Log out</button>
-      </div>
-      <div v-else>
+          Profile
+        </RouterLink>
         <button
-          @click="
-            () => {
-              openLoginModal();
-              mobileMenuOpen = false;
-            }
-          "
-          class="block text-blue-600"
+          @click="handleLogoutMobile"
+          class="w-full text-left py-2 px-3 rounded text-red-500 hover:bg-red-50"
+        >
+          Log out
+        </button>
+      </template>
+      <template v-else>
+        <button
+          @click="openLoginModalMobile"
+          class="block py-2 px-3 rounded text-blue-600 hover:bg-gray-100"
         >
           Log in
         </button>
-      </div>
+      </template>
     </div>
   </header>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useAuthStore } from "@/store";
+import { useAuthStore } from "@/store/auth.store";
 
+/** Store managing authentication state and actions */
 const authStore = useAuthStore();
+
+/** Current route object for active link highlighting */
 const route = useRoute();
+/** Router instance, in case you need to programmatically navigate */
 const router = useRouter();
 
+/** Controls whether the mobile menu is shown */
 const mobileMenuOpen = ref(false);
+
+/** Controls visibility of the profile dropdown menu */
 const showDropdown = ref(false);
 
+/** Ref to the avatar element to detect outside clicks */
+const dropdownAvatarRef = ref(null);
+/** Ref to the dropdown menu itself to detect outside clicks */
+const dropdownMenuRef = ref(null);
+
+/** Navigation links displayed in both desktop and mobile views */
 const navLinks = [
   { path: "#", label: "Browse" },
   { path: "#", label: "Swap Requests" },
   { path: "#", label: "Messages" },
 ];
 
-const isAuthenticated = computed(() => !!authStore.user);
-const isActive = (path) => route.path.startsWith(path);
+/**
+ * Checks if a nav link is currently active based on route
+ * @param {string} path - Route path to check
+ * @returns {boolean}
+ */
+const isActive = (path) =>
+  route.path === path || (path !== "/" && route.path.startsWith(path));
 
+/** Opens the login modal (used in desktop view) */
 const openLoginModal = () => {
+  if (!authStore.isLoadingUser && !authStore.isAuthenticated) {
+  }
   authStore.isLoginModalOpen = true;
 };
 
-const logout = () => {
-  authStore.logout();
-  router.push("/");
+/** Opens the login modal and closes the mobile menu */
+const openLoginModalMobile = () => {
+  openLoginModal();
+  mobileMenuOpen.value = false;
 };
 
+/** Logs out user and closes dropdown menu */
+const handleLogout = async () => {
+  await authStore.logout();
+  showDropdown.value = false;
+};
+
+/** Logs out user from mobile view and closes the mobile menu */
+const handleLogoutMobile = async () => {
+  await authStore.logout();
+  mobileMenuOpen.value = false;
+};
+
+/** Toggles visibility of the user dropdown menu */
 const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value;
 };
+
+/** Closes the dropdown menu */
+const closeDropdown = () => {
+  showDropdown.value = false;
+};
+
+/**
+ * Detects and closes dropdown when a click occurs outside of avatar/menu
+ * @param {MouseEvent} event
+ */
+const handleClickOutside = (event) => {
+  if (
+    showDropdown.value &&
+    dropdownAvatarRef.value &&
+    !dropdownAvatarRef.value.contains(event.target) &&
+    dropdownMenuRef.value &&
+    !dropdownMenuRef.value.contains(event.target)
+  ) {
+    showDropdown.value = false;
+  }
+};
+
+/** Adds event listener for outside click detection */
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside, true); // capture phase
+});
+
+/** Cleans up event listener on unmount */
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleClickOutside, true);
+});
 </script>
+
+<style scoped>
+.dropdown-menu {
+  top: 100%;
+  right: 0;
+}
+.object-cover {
+  object-fit: cover;
+}
+</style>
