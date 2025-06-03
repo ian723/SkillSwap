@@ -8,6 +8,7 @@
       <!-- LOGIN MODAL -->
       <div
         v-if="auth.isLoginModalOpen"
+        @close="auth.isLoginModalOpen = false"
         class="modal-overlay"
         id="login-form"
         @click="closeLoginModal"
@@ -41,6 +42,7 @@ import Footer from "./components/Footer.vue";
 import LoginEmail from "@/components/auth/LoginEmail.vue";
 import SignupEmail from "@/components/auth/SignupEmail.vue";
 import { useAuthStore } from "./store";
+import router from "./router";
 
 /**VARIABLES */
 const auth = useAuthStore();
@@ -53,6 +55,10 @@ const closeLoginModal = () => {
 const closeSignupModal = () => {
   auth.isSignupModalOpen = false;
 };
+
+router.isReady().then(async () => {
+  await auth.fetchUserOnAppLoad();
+});
 </script>
 
 <style scoped>

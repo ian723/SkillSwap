@@ -1,4 +1,4 @@
 import HomeView from "./HomeView.vue";
-export {
-  HomeView,
-};
+import ProfileView from "./ProfileView.vue";
+
+export { HomeView, ProfileView };

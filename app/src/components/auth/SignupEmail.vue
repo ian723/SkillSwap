@@ -12,13 +12,28 @@
         :class="inputClass(v$.email)"
         class="w-full p-2 mb-3 rounded border"
         autocomplete="email"
+        placeholder="Enter your email address"
       />
       <p v-if="v$.email.$error" class="text-red-500 text-sm mb-2">
         <span v-for="err in v$.email.$errors" :key="err.$uid">
           {{ err.$message }}
         </span>
       </p>
-
+      <!-- Username -->
+      <label class="block mb-1">Username</label>
+      <input
+        type="text"
+        v-model="formData.name"
+        :class="inputClass(v$.name)"
+        class="w-full p-2 mb-3 rounded border"
+        autocomplete="username"
+        placeholder="Enter your username"
+      />
+      <p v-if="v$.name.$error" class="text-red-500 text-sm mb-2">
+        <span v-for="err in v$.name.$errors" :key="err.$uid">
+          {{ err.$message }}
+        </span>
+      </p>
       <!-- Password -->
       <label class="block mb-1">Password</label>
       <input
@@ -27,6 +42,7 @@
         :class="inputClass(v$.password)"
         class="w-full p-2 mb-3 rounded border"
         autocomplete="new-password"
+        placeholder="Enter your password"
       />
       <p v-if="v$.password.$error" class="text-red-500 text-sm mb-2">
         <span v-for="err in v$.password.$errors" :key="err.$uid">
@@ -42,6 +58,7 @@
         :class="inputClass(v$.confirmPassword)"
         class="w-full p-2 mb-4 rounded border"
         autocomplete="new-password"
+        placeholder="Re-enter your password"
       />
       <p v-if="v$.confirmPassword.$error" class="text-red-500 text-sm mb-2">
         <span v-for="err in v$.confirmPassword.$errors" :key="err.$uid">
@@ -91,6 +108,7 @@ const isLoading = ref(false);
 /** Reactive form data */
 const formData = reactive({
   email: "",
+  name: "",
   password: "",
   confirmPassword: "",
 });
@@ -98,6 +116,7 @@ const formData = reactive({
 /** Validation rules */
 const rules = computed(() => ({
   email: { required, email },
+  name: { required, minLength: minLength(3) },
   password: { required, minLength: minLength(6) },
   confirmPassword: { required, sameAsPassword: sameAs(formData.password) },
 }));
@@ -117,6 +136,7 @@ const onSubmit = async () => {
   try {
     await auth.register({
       email: formData.email,
+      name: formData.name,
       password: formData.password,
     });
   } finally {

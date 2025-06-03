@@ -1,11 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
-import {
-  HomeView,
-} from "../views";
+import { HomeView, ProfileView } from "../views";
 import { useAuthStore } from "../store";
 
 const routes = [
   { path: "/", name: "home", component: HomeView },
+  { path: "/profile", name: "profile", component: ProfileView },
 ];
 
 /**Initialize here */
