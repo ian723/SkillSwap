@@ -1,236 +1,395 @@
-<!-- src/views/SwapRequestsView.vue -->
 <template>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <header class="mb-8">
+    <!-- Header with title and action button -->
+    <header class="mb-8 flex items-center justify-between">
       <h1 class="text-3xl font-bold tracking-tight text-gray-900">
         Swap Requests
       </h1>
+      <button
+        @click="openNewRequestModal"
+        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+      >
+        New Swap Request
+      </button>
     </header>
 
+    <!-- Tab navigation -->
     <div class="mb-6 flex border-b border-gray-200">
       <button
         @click="setActiveTab('received')"
-        :class="[
-          'py-3 px-4 sm:px-6 text-sm font-medium focus:outline-none -mb-px',
-          activeTab === 'received'
-            ? 'border-b-2 border-blue-600 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-        ]"
+        :class="tabClass('received')"
+        data-testid="received-tab"
       >
         Received
-        <span
-          v-if="counts.received > 0"
-          class="ml-1.5 inline-block py-0.5 px-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700"
-        >
+        <span v-if="counts.received > 0" :class="badgeClass('received')">
           {{ counts.received }}
         </span>
       </button>
       <button
         @click="setActiveTab('sent')"
-        :class="[
-          'py-3 px-4 sm:px-6 text-sm font-medium focus:outline-none -mb-px',
-          activeTab === 'sent'
-            ? 'border-b-2 border-blue-600 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
-        ]"
+        :class="tabClass('sent')"
+        data-testid="sent-tab"
       >
         Sent
-        <span
-          v-if="counts.sent > 0"
-          class="ml-1.5 inline-block py-0.5 px-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700"
-        >
+        <span v-if="counts.sent > 0" :class="badgeClass('sent')">
           {{ counts.sent }}
         </span>
       </button>
     </div>
 
-    <div v-if="loading" class="text-center py-10 text-gray-500">
-      Loading swap requests...
-    </div>
-    <div v-else-if="error" class="text-center py-10 text-red-500">
-      Could not load swap requests: {{ error.message || error }}
-    </div>
-    <div
+    <!-- Loading/Error/Empty States -->
+    <LoadingSpinner v-if="loading" message="Loading swap requests..." />
+    <ErrorState
+      v-else-if="error"
+      :message="error"
+      action-text="Try Again"
+      @action="fetchSwapRequests"
+    />
+    <EmptyState
       v-else-if="filteredRequests.length === 0"
-      class="text-center py-10 text-gray-500"
-    >
-      No {{ activeTab }} swap requests found.
-    </div>
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <!-- Using SwapRequestCard and passing the 'request' prop -->
+      :message="`No ${activeTab} swap requests found`"
+      :action-text="activeTab === 'sent' ? 'Create New Request' : undefined"
+      @action="openNewRequestModal"
+    />
+
+    <!-- Request Cards Grid -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
       <SwapRequestCard
-        v-for="reqItem in filteredRequests"
-        :key="reqItem.id"
-        :request="reqItem"
-        :show-actions="shouldShowActions(reqItem)"
-        :decline-text="getDeclineButtonText(reqItem)"
-        :accept-text="getAcceptButtonText(reqItem)"
+        v-for="request in filteredRequests"
+        :key="request.id"
+        :request="request"
+        :show-actions="shouldShowActions(request)"
+        :decline-text="getDeclineButtonText(request)"
+        :accept-text="getAcceptButtonText(request)"
+        :is-processing="processingRequestId === request.id"
         @decline="handleDeclineRequest"
         @accept="handleAcceptRequest"
+        @view-details="handleViewDetails"
       />
     </div>
+
+    <!-- New Request Modal -->
+    <NewRequestModal
+      v-if="showNewRequestModal"
+      :sending-request="sendingRequest"
+      :new-request-error="newRequestError"
+      :available-users="availableUsersForRequest"
+      :current-user-skills="teachableCurrentUserSkills"
+      :target-user-skills="teachableTargetUserSkills"
+      :loading-current-user-skills="loadingCurrentUserSkills"
+      :loading-target-user-skills="loadingTargetUserSkills"
+      @close="closeModal"
+      @submit="handleSubmitFromModal"
+      @user-selected="fetchTargetUserSkills"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import SwapRequestCard from "@/components/props/SwapRequestCard.vue";
+import NewRequestModal from "@/components/props/NewRequestModal.vue";
+import LoadingSpinner from "@/components/ui/LoadingSpinner.vue";
+import ErrorState from "@/components/ui/ErrorState.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
+import axiosInstance from "@/providers/api/axios";
+import { useAuthStore } from "@/store/auth.store";
+import { useRouter } from "vue-router";
 
+// Constants for API endpoints
+const SWAP_REQUESTS_API_URL = "/swap-requests";
+const USERS_API_URL = "/users";
+const USER_SKILLS_API_URL = "/user-skills";
+
+const authStore = useAuthStore();
+const router = useRouter();
+
+// State management
 const activeTab = ref("received");
 const allRequests = ref([]);
 const loading = ref(true);
 const error = ref(null);
+const processingRequestId = ref(null);
 
-const counts = computed(() => ({
-  received: allRequests.value.filter(
-    (r) => r.type === "received" && r.status === "pending"
-  ).length,
-  sent: allRequests.value.filter((r) => r.type === "sent").length, 
-}));
+// New request modal state
+const showNewRequestModal = ref(false);
+const sendingRequest = ref(false);
+const newRequestError = ref(null);
+const allAvailableUsers = ref([]);
+const currentUserSkills = ref([]);
+const targetUserSkills = ref([]);
+const loadingCurrentUserSkills = ref(false);
+const loadingTargetUserSkills = ref(false);
 
-const filteredRequests = computed(() => {
-  return allRequests.value.filter(
-    (request) => request.type === activeTab.value
-  );
+// Form model
+const newRequestForm = ref({
+  toUserId: "",
+  offeredSkillId: "",
+  requestedSkillId: "",
+  message: "",
 });
 
+// Computed properties
+const counts = computed(() => {
+  if (!authStore.user) return { received: 0, sent: 0 };
+
+  const received = allRequests.value.filter(
+    (req) => req.toUser.id === authStore.user.id && req.status === "pending"
+  ).length;
+
+  const sent = allRequests.value.filter(
+    (req) => req.fromUser.id === authStore.user.id
+  ).length;
+
+  return { received, sent };
+});
+
+const filteredRequests = computed(() => {
+  if (!authStore.user) return [];
+
+  return activeTab.value === "received"
+    ? allRequests.value.filter((req) => req.toUser.id === authStore.user.id)
+    : allRequests.value.filter((req) => req.fromUser.id === authStore.user.id);
+});
+
+const availableUsersForRequest = computed(() =>
+  allAvailableUsers.value.filter((user) => user.id !== authStore.user?.id)
+);
+
+const teachableCurrentUserSkills = computed(() =>
+  currentUserSkills.value.filter((skill) => skill.type === "teach")
+);
+
+const teachableTargetUserSkills = computed(() =>
+  targetUserSkills.value.filter((skill) => skill.type === "teach")
+);
+
+// Tab styling helpers
+const tabClass = (tabName) => [
+  "py-3 px-4 sm:px-6 text-sm font-medium focus:outline-none -mb-px transition-colors duration-150",
+  activeTab.value === tabName
+    ? "border-b-2 border-blue-600 text-blue-600"
+    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+];
+
+const badgeClass = (tabName) => [
+  "ml-1.5 inline-block py-0.5 px-1.5 rounded-full text-xs font-semibold",
+  activeTab.value === tabName
+    ? "bg-blue-100 text-blue-700"
+    : "bg-gray-100 text-gray-700",
+];
+
+// Request card helpers
+const shouldShowActions = (request) => {
+  const isSender = request.fromUser.id === authStore.user.id;
+  return (
+    request.status === "pending" &&
+    (isSender || request.toUser.id === authStore.user.id)
+  );
+};
+
+const getDeclineButtonText = (request) => {
+  return request.fromUser.id === authStore.user.id
+    ? "Cancel Request"
+    : "Decline";
+};
+
+const getAcceptButtonText = () => "Accept";
+
+// Tab management
 const setActiveTab = (tab) => {
   activeTab.value = tab;
 };
 
-const shouldShowActions = (request) => {
-  if (request.type === "received" && request.status === "pending") {
-    return true;
-  }
-  if (request.type === "sent" && request.status === "pending") {
-    return true;
-  }
-  return false;
-};
-
-const getDeclineButtonText = (request) => {
-  if (request.type === "sent" && request.status === "pending") return "Cancel";
-  return "Decline";
-};
-const getAcceptButtonText = (request) => {
-  // For sent items, the "accept" button might not make sense, or it could be "View Details"
-  // Or, if showActions is true for sent pending, maybe there's only a "Cancel" (declineText) button.
-  // Adjust logic based on your exact UX for "sent" items.
-  if (request.type === "sent" && request.status === "pending") return "View"; // Example
-  return "Accept";
-};
-
+// API operations
 const fetchSwapRequests = async () => {
+  if (!authStore.user) {
+    error.value = "Please log in to view swap requests.";
+    loading.value = false;
+    return;
+  }
+
   loading.value = true;
   error.value = null;
+
   try {
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API delay
-    allRequests.value = [
-      // Received Requests Examples
-      {
-        id: "req1",
-        user: {
-          id: "user1",
-          name: "Oliv Vandesit",
-          handle: "Managno",
-          avatarUrl: "https://randomuser.me/api/portraits/men/1.jpg",
-          subtitle: "Wants to learn Python",
-        },
-        skills: ["Cip", "Graname", "Cavis"], // Skills involved in the request
-        messageSnippet:
-          "Phtorpher expectiso cs. quareom ne.schaimmetnc. Learett annave age. Interested in swapping my Graphic Design skills for your Python tutoring.",
-        timestamp: "Just now",
-        type: "received",
-        status: "pending",
-      },
-      {
-        id: "req2",
-        user: {
-          id: "user2",
-          name: "Enily Devan",
-          handle: "Derritingo",
-          avatarUrl: "https://randomuser.me/api/portraits/women/2.jpg",
-          subtitle: "Offering Web Development",
-        },
-        skills: ["Lavel!crnp?", "Panhom"],
-        messageSnippet:
-          "Lorent ipsum natue wety mimeer.renat. Happy to teach Laravel if you can help me with Panhom.",
-        timestamp: "4 hours ago",
-        type: "received",
-        status: "accepted",
-      },
-      // Sent Requests Examples
-      {
-        id: "req3",
-        user: {
-          id: "user3",
-          name: "Aizos Cobater",
-          handle: "Mersiting Insam",
-          avatarUrl: "https://randomuser.me/api/portraits/women/3.jpg",
-          subtitle: "Requested Python help",
-        },
-        skills: ["Birg", "Python", "TWI"],
-        messageSnippet:
-          "Bivlings aaphicamently miner cereioct. I saw you offer Python, could you help me with TWI concepts?",
-        timestamp: "5 hours ago",
-        type: "sent",
-        status: "pending",
-      },
-      {
-        id: "req4",
-        user: {
-          id: "user4",
-          name: "Alivia Bedila",
-          handle: "Plardooro",
-          avatarUrl: "https://randomuser.me/api/portraits/men/4.jpg",
-          subtitle: "Asked about Learning",
-        },
-        skills: ["Learn", "Python"],
-        messageSnippet:
-          "Er.cant comma larms. niving proderm efficient. Your offer to teach Python is interesting, I would like to learn.",
-        timestamp: "4 hours ago",
-        type: "sent",
-        status: "declined",
-      },
-    ];
-  } catch (e) {
-    console.error("Failed to fetch swap requests:", e);
-    error.value = e;
+    const [sent, received] = await Promise.all([
+      axiosInstance.get(`${SWAP_REQUESTS_API_URL}?type=sent`),
+      axiosInstance.get(`${SWAP_REQUESTS_API_URL}?type=received`),
+    ]);
+
+    // Merge and deduplicate requests
+    const uniqueRequests = new Map();
+    [...sent.data, ...received.data].forEach((req) => {
+      uniqueRequests.set(req.id, req);
+    });
+
+    allRequests.value = Array.from(uniqueRequests.values()).sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  } catch (err) {
+    handleApiError(err, "Failed to fetch swap requests");
   } finally {
     loading.value = false;
   }
 };
 
-onMounted(() => {
-  fetchSwapRequests();
-});
+const updateRequestStatus = async (requestId, status) => {
+  if (processingRequestId.value) return;
+  processingRequestId.value = requestId;
 
-const handleDeclineRequest = async (requestId) => {
-  console.log("Declining/Cancelling request ID:", requestId);
-  const request = allRequests.value.find((r) => r.id === requestId);
-  if (!request) return;
-  // --- TODO: API call to backend ---
-  // Example: await api.post(`/swap-requests/${requestId}/decline_or_cancel`);
-  if (request.type === "received") request.status = "declined";
-  else if (request.type === "sent") request.status = "cancelled";
-  // --- Then update UI or re-fetch ---
-};
-
-const handleAcceptRequest = async (requestId) => {
-  const request = allRequests.value.find((r) => r.id === requestId);
-  if (!request || request.type === "sent") {
-    // Only accept received requests
-    console.log(
-      "Viewing details for sent request ID (or invalid action):",
-      requestId
+  try {
+    const response = await axiosInstance.patch(
+      `${SWAP_REQUESTS_API_URL}/${requestId}/status`,
+      { status }
     );
-    // TODO: Navigate to a detailed view if 'View' was clicked for a sent item
-    return;
+
+    // Update request in local state
+    const index = allRequests.value.findIndex((r) => r.id === requestId);
+    if (index !== -1) {
+      allRequests.value.splice(index, 1, response.data);
+    }
+  } catch (err) {
+    handleApiError(err, "Failed to update request status");
+  } finally {
+    processingRequestId.value = null;
   }
-  console.log("Accepting request ID:", requestId);
-  // --- TODO: API call to backend ---
-  // Example: await api.post(`/swap-requests/${requestId}/accept`);
-  request.status = "accepted";
-  // --- Then update UI or re-fetch ---
 };
+
+// New request modal operations
+const fetchAllUsers = async () => {
+  try {
+    const response = await axiosInstance.get(USERS_API_URL);
+    allAvailableUsers.value = response.data;
+  } catch (err) {
+    handleApiError(err, "Failed to fetch users");
+  }
+};
+
+const fetchCurrentUserSkills = async () => {
+  if (!authStore.user?.id) return;
+
+  loadingCurrentUserSkills.value = true;
+  try {
+    const response = await axiosInstance.get(
+      `${USER_SKILLS_API_URL}/user/${authStore.user.id}`
+    );
+    currentUserSkills.value = response.data;
+  } catch (err) {
+    handleApiError(err, "Failed to fetch your skills");
+  } finally {
+    loadingCurrentUserSkills.value = false;
+  }
+};
+
+const fetchTargetUserSkills = async (userId) => {
+  if (!userId) return;
+
+  loadingTargetUserSkills.value = true;
+  try {
+    const response = await axiosInstance.get(
+      `${USER_SKILLS_API_URL}/user/${userId}`
+    );
+    targetUserSkills.value = response.data;
+  } catch (err) {
+    handleApiError(err, "Failed to fetch user skills");
+  } finally {
+    loadingTargetUserSkills.value = false;
+  }
+};
+
+// Event handlers
+const handleDeclineRequest = (requestId) => {
+  const request = allRequests.value.find((r) => r.id === requestId);
+  const status =
+    request.fromUser.id === authStore.user.id ? "cancelled" : "declined";
+
+  updateRequestStatus(requestId, status);
+};
+
+const handleAcceptRequest = (requestId) => {
+  updateRequestStatus(requestId, "accepted");
+};
+
+const handleViewDetails = (requestId) => {
+  router.push({ name: "SwapRequestDetail", params: { id: requestId } });
+};
+
+const openNewRequestModal = async () => {
+  resetNewRequestForm();
+  showNewRequestModal.value = true;
+
+  // Fetch data for modal
+  await Promise.all([fetchAllUsers(), fetchCurrentUserSkills()]);
+};
+
+const closeModal = () => {
+  showNewRequestModal.value = false;
+  resetNewRequestForm();
+  newRequestError.value = null;
+};
+
+const resetNewRequestForm = () => {
+  newRequestForm.value = {
+    toUserId: "",
+    offeredSkillId: "",
+    requestedSkillId: "",
+    message: "",
+  };
+  targetUserSkills.value = [];
+};
+
+const handleSubmitFromModal = async (formDataFromModal) => {
+  sendingRequest.value = true;
+  newRequestError.value = null;
+
+  const payload = {
+    toUserId: formDataFromModal.toUserId,
+    offeredSkillId: formDataFromModal.offeredSkillId,
+    requestedSkillId: formDataFromModal.requestedSkillId,
+    message: formDataFromModal.message,
+  };
+
+  try {
+    const response = await axiosInstance.post(SWAP_REQUESTS_API_URL, payload);
+    allRequests.value.unshift(response.data);
+    allRequests.value.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    closeModal();
+    if (activeTab.value !== "sent") {
+    }
+  } catch (err) {
+    handleApiError(err, "Failed to send swap request");
+  } finally {
+    sendingRequest.value = false;
+  }
+};
+
+// Utility functions
+const handleApiError = (error, defaultMessage) => {
+  const serverMessage = error.response?.data?.message;
+  newRequestError.value = serverMessage || defaultMessage;
+  console.error(`${defaultMessage}:`, error);
+};
+
+// Lifecycle hooks
+onMounted(() => {
+  if (authStore.user) {
+    fetchSwapRequests();
+  } else {
+    // Wait for authentication if needed
+    const unwatch = watch(
+      () => authStore.user,
+      (user) => {
+        if (user) {
+          fetchSwapRequests();
+          unwatch();
+        }
+      }
+    );
+  }
+});
 </script>
