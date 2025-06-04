@@ -1,4 +1,3 @@
-<!-- Header.vue -->
 <template>
   <header class="bg-white shadow-md sticky top-0 z-50">
     <nav class="max-w-7xl mx-auto px-4 flex items-center justify-between py-4">
@@ -154,9 +153,9 @@ const dropdownMenuRef = ref(null);
 
 /** Navigation links displayed in both desktop and mobile views */
 const navLinks = [
-  { path: "#", label: "Browse" },
-  { path: "#", label: "Swap Requests" },
-  { path: "#", label: "Messages" },
+  { path: "/browse", label: "Browse" },
+  { path: "/swap", label: "Swap Requests" },
+  { path: "/messages", label: "Messages" },
 ];
 
 /**
