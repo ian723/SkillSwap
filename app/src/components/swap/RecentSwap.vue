@@ -6,7 +6,7 @@
         Swap Requests
       </h1>
       <button
-        @click="openNewRequestModal"
+        @click="openNewRequestModalFromHeader"
         class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
       >
         New Swap Request

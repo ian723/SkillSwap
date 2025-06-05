@@ -10,7 +10,7 @@
       </h1>
       <p class="text-lg md:text-xl text-gray-700">
         SkillSwap connects learners and experts. Share what you know. Learn what
-        you don't. No money needed — just mutual growth.
+        you don't. No money needed just mutual growth.
       </p>
       <div class="flex justify-center space-x-4">
         <button
