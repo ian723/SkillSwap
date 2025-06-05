@@ -1,11 +1,13 @@
 <template>
     <div>
-        <Profile/>
+        <Message/>
     </div>
 </template>
 
 <script setup>
-import Profile from "@/components/common/Profile.vue";
+
+import Message from '../components/message/message.vue';
+
 </script>
 
 <style lang="scss" scoped>

@@ -1,10 +1,30 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { HomeView, ProfileView } from "../views";
+import {
+  HomeView,
+  ProfileView,
+  BrowseView,
+  SwapView,
+  MessageView,
+} from "../views";
 import { useAuthStore } from "../store";
 
 const routes = [
   { path: "/", name: "home", component: HomeView },
-  { path: "/profile", name: "profile", component: ProfileView },
+  { path: "/browse", name: "browse", component: BrowseView },
+  { path: "/swap", name: "swap", component: SwapView },
+  { path: "/messages", name: "messages", component: MessageView },
+  {
+    path: "/profile/:id",
+    name: "Userprofile",
+    component: ProfileView,
+    props: true,
+  },
+  {
+    path: "/profile",
+    name: "Myprofile",
+    component: ProfileView,
+    meta: { requiresAuth: true },
+  },
 ];
 
 /**Initialize here */

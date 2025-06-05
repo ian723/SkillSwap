@@ -1,11 +1,11 @@
 <template>
   <div>
-    <LandingPage />
+    <RecentSwap />
   </div>
 </template>
 
 <script setup>
-import LandingPage from "@/components/common/LandingPage.vue";
+import RecentSwap from "../components/swap/RecentSwap.vue";
 </script>
 
 <style lang="scss" scoped></style>
