@@ -5,7 +5,7 @@
 </template>
 
 <script setup>
-import Profile from "@/components/Profile.vue";
+import Profile from "@/components/common/Profile.vue";
 </script>
 
 <style lang="scss" scoped>

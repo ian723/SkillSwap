@@ -80,12 +80,17 @@
             <option v-if="loadingCurrentUserSkills" disabled value="">
               Loading your skills...
             </option>
+            <!-- Loop variable is userSkillItem (which is a UserSkillDto) -->
             <option
-              v-for="skill in currentUserSkills"
-              :key="skill.id"
-              :value="skill.id"
+              v-for="userSkillItem in currentUserSkills"
+              :key="userSkillItem.skill.id"
+              :value="userSkillItem.skill.id"
             >
-              {{ skill.skill.name }}
+              {{ userSkillItem.skill.name }}
+              <!-- Display Skill Name -->
+              <span v-if="userSkillItem.type" class="text-xs text-gray-500">
+                ({{ userSkillItem.type }})</span
+              >
             </option>
           </select>
         </div>
@@ -124,12 +129,17 @@
             >
               User has no skills marked as 'teach'
             </option>
+            <!-- Loop variable is userSkillItem (which is a UserSkillDto) -->
             <option
-              v-for="skill in targetUserSkills"
-              :key="skill.id"
-              :value="skill.id"
+              v-for="userSkillItem in targetUserSkills"
+              :key="userSkillItem.skill.id"
+              :value="userSkillItem.skill.id"
             >
-              {{ skill.skill.name }}
+              {{ userSkillItem.skill.name }}
+              <!-- Display Skill Name -->
+              <span v-if="userSkillItem.type" class="text-xs text-gray-500">
+                ({{ userSkillItem.type }})</span
+              >
             </option>
           </select>
         </div>
@@ -216,6 +226,7 @@ const isFormValid = computed(() => {
 
 // Handle user selection change
 const onUserChange = () => {
+  formData.value.requestedSkillId = "";
   if (formData.value.toUserId) {
     emit("user-selected", formData.value.toUserId);
   }
@@ -224,18 +235,12 @@ const onUserChange = () => {
 // Handle form submission
 const submitForm = () => {
   if (!isFormValid.value) {
-    errorMessage.value =
-      "Please select a user, offered skill, and requested skill";
+    // Update local error or rely on parent to pass it via newRequestError prop
+    // For now, let parent handle error display
+    emit("submit", null); // Or emit with an error indicator
     return;
   }
-  errorMessage.value = "";
-
-  emit("submit", {
-    toUserId: formData.value.toUserId,
-    offeredSkillId: formData.value.offeredSkillId,
-    requestedSkillId: formData.value.requestedSkillId,
-    message: formData.value.message.trim() || undefined,
-  });
+  emit("submit", { ...formData.value }); // Send a copy
 };
 
 // Reset form when modal closes

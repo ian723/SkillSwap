@@ -139,13 +139,13 @@
 <script setup>
 import { reactive, ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
-import UserSkillCard from "@/components/props/UserSkillCard.vue"; // Path to your UserSkillCard
-import LoadingSpinner from "@/components/ui/LoadingSpinner.vue"; // Create these simple UI components
+import UserSkillCard from "@/components/props/UserSkillCard.vue";
+import LoadingSpinner from "@/components/ui/LoadingSpinner.vue";
 import ErrorState from "@/components/ui/ErrorState.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
 import axiosInstance from "@/providers/api/axios";
 
-const USERS_API_BASE_URL = "/users"; // Base URL for user-related endpoints
+const USERS_API_BASE_URL = "/users";
 
 const router = useRouter();
 
@@ -154,13 +154,13 @@ const searchForm = reactive({
   wantsToLearn: "",
 });
 
-const recentUsers = ref([]); // Stores data from /users/recent-active
-const searchResults = ref([]); // Stores data from /users/search
-const loadingUsers = ref(true); // Unified loading state
-const usersError = ref(null); // Unified error state
-const isSearching = ref(false); // For search button loading state
-const searchError = ref(null); // For errors specific to the search form submission
-const hasSearched = ref(false); // To toggle between recent and search results display
+const recentUsers = ref([]);
+const searchResults = ref([]);
+const loadingUsers = ref(true);
+const usersError = ref(null);
+const isSearching = ref(false);
+const searchError = ref(null);
+const hasSearched = ref(false);
 
 const displayedUsers = computed(() => {
   return hasSearched.value ? searchResults.value : recentUsers.value;
@@ -176,9 +176,7 @@ const fetchRecentUsers = async () => {
   try {
     const response = await axiosInstance.get(
       `${USERS_API_BASE_URL}/recent-active?limit=8`
-    ); // Fetch 8 for a 4-col grid
-    // Backend should return UserCardDataDto[] or UserProfileDto[]
-    // This structure should match what UserSkillCard's :profile prop expects
+    );
     recentUsers.value = response.data;
   } catch (err) {
     console.error(
@@ -189,7 +187,6 @@ const fetchRecentUsers = async () => {
     usersError.value =
       err.response?.data?.message || "Could not load recent users.";
   } finally {
-    // Only set global loading to false if a search isn't overriding it
     if (!isSearching.value) {
       loadingUsers.value = false;
     }
@@ -199,29 +196,26 @@ const fetchRecentUsers = async () => {
 const executeSearch = async () => {
   if (!searchForm.canTeach && !searchForm.wantsToLearn) {
     searchError.value = "Please enter at least one skill to search.";
-    // Optionally revert to recent users if search is cleared
-    // clearSearchAndShowRecent(); // Or just show the error and let user clear
+    clearSearchAndShowRecent();
     return;
   }
 
-  isSearching.value = true; // For search button spinner
-  loadingUsers.value = true; // For the results area spinner
-  usersError.value = null; // Clear previous general errors
-  searchError.value = null; // Clear previous search form errors
-  hasSearched.value = true; // Indicate that a search has been performed
-  searchResults.value = []; // Clear previous search results
+  isSearching.value = true;
+  loadingUsers.value = true;
+  usersError.value = null;
+  searchError.value = null;
+  hasSearched.value = true;
+  searchResults.value = [];
 
   try {
     const params = {};
-    // Backend logic: if I canTeach 'Python', I'm looking for users who wantToLearn 'Python'
     if (searchForm.canTeach) params.wantsToLearn = searchForm.canTeach;
-    // Backend logic: if I wantToLearn 'Guitar', I'm looking for users who canTeach 'Guitar'
     if (searchForm.wantsToLearn) params.canTeach = searchForm.wantsToLearn;
 
     const response = await axiosInstance.get(`${USERS_API_BASE_URL}/search`, {
       params,
     });
-    searchResults.value = response.data; // Expects UserCardDataDto[] or UserProfileDto[]
+    searchResults.value = response.data;
   } catch (err) {
     console.error("Search failed:", err.response?.data || err.message, err);
     usersError.value =
@@ -239,12 +233,9 @@ const clearSearchAndShowRecent = () => {
   searchResults.value = [];
   usersError.value = null;
   searchError.value = null;
-  // If recentUsers is empty and not currently loading, fetch them
-  // This ensures "Recent Activity" is populated if user clears search without any prior results
   if (recentUsers.value.length === 0 && !loadingUsers.value) {
     fetchRecentUsers();
   } else if (recentUsers.value.length > 0) {
-    // If recent users are already loaded, ensure the loading state is false for the display section
     loadingUsers.value = false;
   }
 };
@@ -254,6 +245,6 @@ const handleViewUserProfile = (userId) => {
 };
 
 onMounted(() => {
-  fetchRecentUsers(); // Load recent users when the component mounts
+  fetchRecentUsers();
 });
 </script>

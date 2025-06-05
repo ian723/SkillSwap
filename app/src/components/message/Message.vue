@@ -1,11 +1,13 @@
 <template>
   <div
-    class="max-w-7xl mx-auto h-[calc(100vh-var(--header-height,80px)-2rem)] sm:h-[calc(100vh-var(--header-height,80px)-4rem)] my-4 sm:my-8"
+    class="max-w-7xl mx-auto h-[calc(100vh-var(--header-height,80px)-2rem)] sm:h-[calc(100vh-var(--header-height,80px)-4rem)] my-4 sm:my-8 px-2 sm:px-4"
   >
-    <div class="flex h-full bg-white shadow-lg rounded-lg overflow-hidden">
+    <div
+      class="flex flex-col sm:flex-row h-full bg-white shadow-lg rounded-lg overflow-hidden"
+    >
       <!-- Left Panel -->
       <div
-        class="w-full sm:w-1/3 lg:w-1/4 border-r border-gray-200 flex flex-col"
+        class="w-full sm:w-1/3 lg:w-1/4 border-b sm:border-b-0 sm:border-r border-gray-200 flex flex-col"
       >
         <div class="p-4 border-b border-gray-200">
           <h2 class="text-xl font-semibold text-gray-800">Messages</h2>
@@ -52,6 +54,7 @@
       <!-- Right Panel -->
       <div class="flex-1 flex flex-col bg-gray-50">
         <div v-if="selectedConversation" class="flex flex-col h-full">
+          <!-- Header -->
           <div
             class="p-4 border-b border-gray-200 bg-white flex items-center justify-between"
           >
@@ -72,9 +75,10 @@
             </div>
           </div>
 
+          <!-- Messages -->
           <div
             ref="messagesContainerRef"
-            class="flex-grow overflow-y-auto px-4 sm:px-6 py-3 space-y-3 sm:space-y-4 transition-all"
+            class="flex-grow overflow-y-auto px-4 sm:px-6 py-3 space-y-3 sm:space-y-4"
           >
             <div
               v-if="messagesLoading"
@@ -107,6 +111,7 @@
             </div>
           </div>
 
+          <!-- Input -->
           <div class="p-4 border-t border-gray-200 bg-white">
             <form
               @submit.prevent="handleSendMessage"
@@ -132,9 +137,10 @@
           </div>
         </div>
 
+        <!-- Empty State -->
         <div
           v-else
-          class="flex-grow flex items-center justify-center text-gray-400 p-10 text-center"
+          class="flex-grow flex items-center justify-center text-gray-400 p-6 text-center text-sm sm:text-base"
         >
           <p v-if="!conversationsLoading && conversations.length > 0">
             Select a conversation to start chatting.

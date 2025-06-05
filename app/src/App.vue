@@ -37,7 +37,7 @@
 
 <script setup>
 import { RouterView } from "vue-router";
-import Header from "./components/Header.vue";
+import Header from "./components/common/Header.vue";
 // import Footer from "./components/Footer.vue";
 import LoginEmail from "@/components/auth/LoginEmail.vue";
 import SignupEmail from "@/components/auth/SignupEmail.vue";

@@ -302,10 +302,34 @@ const fetchTargetUserSkills = async (userId) => {
 // Event handlers
 const handleDeclineRequest = (requestId) => {
   const request = allRequests.value.find((r) => r.id === requestId);
-  const status =
-    request.fromUser.id === authStore.user.id ? "cancelled" : "declined";
+  if (!request) {
+    console.error(
+      `Cannot find request with ID ${requestId} to decline/cancel.`
+    );
+    return;
+  }
 
-  updateRequestStatus(requestId, status);
+  let statusToSet;
+  // Determine if the current user is the sender (initiator) of this request
+  const isCurrentUserSender = request.fromUser.id === authStore.user?.id;
+
+  if (isCurrentUserSender && request.status === "pending") {
+    statusToSet = "cancelled"; // Sender cancels their own pending request
+  } else if (
+    request.toUser.id === authStore.user?.id &&
+    request.status === "pending"
+  ) {
+    statusToSet = "declined"; // Receiver declines a pending request
+  } else {
+    console.warn(
+      `Invalid action: Cannot decline/cancel request ${requestId} in status ${request.status} by this user.`
+    );
+    // Optionally show a user-facing error message here
+    // Example: newRequestError.value = "This action cannot be performed on this request.";
+    return;
+  }
+
+  updateRequestStatus(requestId, statusToSet);
 };
 
 const handleAcceptRequest = (requestId) => {

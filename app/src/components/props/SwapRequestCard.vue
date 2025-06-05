@@ -1,13 +1,12 @@
+<!-- src/components/SwapRequestCard.vue -->
 <template>
-  <!-- Outer Card -->
   <div
     class="bg-white p-4 sm:p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col justify-between"
   >
-    <!-- Request Content -->
+    <!-- ... (Request Content remains the same) ... -->
     <div>
       <!-- Top: User Info and Timestamp -->
       <div class="flex items-start mb-3">
-        <!-- Partner Avatar -->
         <img
           :src="
             partnerInRequest.avatarUrl ||
@@ -16,8 +15,6 @@
           alt="User avatar"
           class="w-12 h-12 sm:w-14 sm:h-14 rounded-full mr-3 object-cover border"
         />
-
-        <!-- Partner Name and Meta Info -->
         <div class="flex-1 min-w-0">
           <div class="flex justify-between items-start">
             <h3
@@ -31,16 +28,14 @@
               {{ formattedTimestamp }}
             </p>
           </div>
-          <!-- Request Direction Note -->
-          <p v-if="request.type === 'received'" class="text-xs text-gray-500">
+          <p v-if="requestType === 'received'" class="text-xs text-gray-500">
             Sent you a request
           </p>
-          <p v-if="request.type === 'sent'" class="text-xs text-gray-500">
+          <p v-if="requestType === 'sent'" class="text-xs text-gray-500">
             You sent a request
           </p>
         </div>
       </div>
-
       <!-- Skills Offered and Requested -->
       <div class="mb-3 text-sm">
         <div class="mb-1">
@@ -56,7 +51,6 @@
           }}</span>
         </div>
       </div>
-
       <!-- Optional Message -->
       <p
         v-if="request.message"
@@ -71,40 +65,47 @@
 
     <!-- Bottom: Actions or Status -->
     <div class="mt-auto pt-3">
-      <!-- Action Buttons (Accept/Decline) -->
+      <!-- Action Buttons -->
       <div
-        v-if="showActions"
+        v-if="isPending"
         class="flex flex-col sm:flex-row sm:justify-end sm:space-x-3 space-y-2 sm:space-y-0"
       >
-        <button
-          @click="handleDecline"
-          class="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
-          :disabled="isProcessing"
-        >
-          {{ declineText }}
-        </button>
+        <!-- For RECEIVED PENDING requests: Decline / Accept -->
+        <template v-if="requestType === 'received'">
+          <button
+            @click="handleDecline"
+            :disabled="isProcessing"
+            class="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+          >
+            Decline
+          </button>
+          <button
+            @click="handleAccept"
+            :disabled="isProcessing"
+            class="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          >
+            Accept
+          </button>
+        </template>
 
-        <!-- Conditionally render Accept/View button -->
-        <button
-          v-if="!(request.type === 'sent' && request.status === 'pending')"
-          @click="handleAccept"
-          class="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-          :disabled="isProcessing"
-        >
-          {{ acceptText }}
-        </button>
+        <!-- For SENT PENDING requests: Cancel Request -->
+        <template v-if="requestType === 'sent'">
+          <button
+            @click="handleDecline"
+            :disabled="isProcessing"
+            class="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+          >
+            Cancel Request
+          </button>
+          <!-- Optionally, a "View Details" button for sent items if it leads somewhere -->
+          <!-- <button @click="handleViewDetails" class="w-full sm:w-auto ...">View Details</button> -->
+        </template>
       </div>
 
-      <!-- If no actions, show status badge -->
+      <!-- If not pending, show status badge -->
       <div v-else-if="request.status" class="text-right">
         <span
-          :class="{
-            'text-green-600':
-              request.status === 'accepted' || request.status === 'completed',
-            'text-red-600':
-              request.status === 'declined' || request.status === 'cancelled',
-            'text-yellow-600': request.status === 'pending',
-          }"
+          :class="statusClass"
           class="text-sm font-semibold px-2 py-1 rounded-full"
           :style="{ backgroundColor: statusColorMap[request.status] + '20' }"
         >
@@ -119,32 +120,30 @@
 import { defineProps, defineEmits, computed } from "vue";
 import { useAuthStore } from "@/store/auth.store";
 
-/**props */
 const props = defineProps({
   request: { type: Object, required: true },
-  showActions: { type: Boolean, default: true },
-  declineText: { type: String, default: "Decline" },
-  acceptText: { type: String, default: "Accept" },
+  // showActions, declineText, acceptText are no longer needed as props here
+  // if the card manages its own button display logic.
+  // If parent still needs to override, keep them. For this solution, I'm removing them.
   isProcessing: { type: Boolean, default: false },
 });
 
-/**Emit */
 const emit = defineEmits(["decline", "accept", "view-details"]);
-
-/**Auth store to get current user */
 const authStore = useAuthStore();
 
-/**Compute the "partner" in the request (not the logged-in user) */
+const requestType = computed(() => {
+  if (!props.request || !authStore.user) return "unknown";
+  return props.request.fromUser.id === authStore.user.id ? "sent" : "received";
+});
+
 const partnerInRequest = computed(() => {
-  if (!props.request || !authStore.user) {
+  if (!props.request || !authStore.user)
     return { name: "User", id: "unknown", avatarUrl: "" };
-  }
-  return props.request.fromUser.id === authStore.user.id
+  return requestType.value === "sent"
     ? props.request.toUser
     : props.request.fromUser;
 });
 
-/**Format the creation timestamp */
 const formattedTimestamp = computed(() => {
   if (!props.request.createdAt) return "";
   return new Date(props.request.createdAt).toLocaleDateString([], {
@@ -153,36 +152,47 @@ const formattedTimestamp = computed(() => {
   });
 });
 
-/**Status colors used for background badge styling */
 const statusColorMap = {
   pending: "#FBBF24", // amber-400
   accepted: "#10B981", // green-500
   declined: "#EF4444", // red-500
   completed: "#3B82F6", // blue-500
-  cancelled: "#71717A", // zinc-500
+  cancelled: "#71717A", // zinc-500 (Added 'cancelled' for sender's action)
 };
 
-/**Format the status text */
 const formattedStatus = computed(() => {
   if (!props.request.status) return "";
   const s = props.request.status;
   return s.charAt(0).toUpperCase() + s.slice(1);
 });
 
-/**Emit decline */
+const statusClass = computed(() => {
+  return {
+    "text-green-600":
+      props.request.status === "accepted" ||
+      props.request.status === "completed",
+    "text-red-600":
+      props.request.status === "declined" ||
+      props.request.status === "cancelled",
+    "text-yellow-600": props.request.status === "pending",
+  };
+});
+
+const isPending = computed(() => props.request.status === "pending");
+
+// Emit 'decline' (which parent will map to 'declined' or 'cancelled' API call)
 const handleDecline = () => {
   emit("decline", props.request.id);
 };
 
-/**Emit accept or view details */
+// Emit 'accept' (only for received)
 const handleAccept = () => {
-  if (
-    props.request.type === "sent" &&
-    props.acceptText.toLowerCase().includes("view")
-  ) {
-    emit("view-details", props.request.id);
-  } else {
+  if (requestType.value === "received") {
     emit("accept", props.request.id);
   }
 };
+
+// const handleViewDetails = () => { // If you have a view details button
+//   emit("view-details", props.request.id);
+// };
 </script>
