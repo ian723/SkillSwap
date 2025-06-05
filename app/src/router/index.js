@@ -13,7 +13,18 @@ const routes = [
   { path: "/browse", name: "browse", component: BrowseView },
   { path: "/swap", name: "swap", component: SwapView },
   { path: "/messages", name: "messages", component: MessageView },
-  { path: "/profile", name: "profile", component: ProfileView },
+  {
+    path: "/profile/:id",
+    name: "Userprofile",
+    component: ProfileView,
+    props: true,
+  },
+  {
+    path: "/profile",
+    name: "Myprofile",
+    component: ProfileView,
+    meta: { requiresAuth: true },
+  },
 ];
 
 /**Initialize here */
